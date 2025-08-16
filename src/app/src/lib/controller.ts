@@ -66,7 +66,7 @@ export interface ControllerListeners {
     'gcode:loaded': Array<Function>; // TO BE DEPRECATED
     'gcode:toolChange': Array<Function>;
     'feeder:status': Array<Function>;
-    'feeder:pause':  Array<Function>;
+    'feeder:pause': Array<Function>;
     'workflow:pause': Array<Function>;
     'sender:status': Array<Function>;
     'workflow:state': Array<Function>;
@@ -99,6 +99,7 @@ export interface ControllerListeners {
     'flash:message': Array<Function>;
     'flash:progress': Array<Function>;
     'spindle:add': Array<Function>;
+    atci: Array<Function>;
 
     //A-Axis A.K.A Rotary-Axis events
     'rotaryAxis:updateState': Array<Function>;
@@ -107,6 +108,8 @@ export interface ControllerListeners {
 
     requestEstimateData: Array<Function>;
     'job:start': Array<Function>;
+    'sdcard:files': Array<Function>;
+    'sdcard:clear': Array<Function>;
 }
 
 const ensureArray = (...args: Array<any>) => {
@@ -210,6 +213,9 @@ class Controller {
 
         requestEstimateData: [],
         'job:start': [],
+        'sdcard:files': [],
+        'sdcard:clear': [],
+        atci: [],
     };
 
     context = {

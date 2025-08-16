@@ -53,6 +53,7 @@ const defaultState: State = {
         reverseWidgets: false,
         spindleFunctions: false,
         coolantFunctions: true,
+        atcEnabled: false,
         safeRetractHeight: 0,
         customDecimalPlaces: 0,
         jobsFinished: 0,
@@ -153,6 +154,9 @@ const defaultState: State = {
         enableDarkMode: false,
     },
     widgets: {
+        atc: {
+            toolMap: {},
+        },
         axes: {
             minimized: false,
             axes: ['x', 'y', 'z'],
@@ -329,7 +333,7 @@ const defaultState: State = {
             cutDirectionFlipped: false,
             shouldDwell: false,
             flood: false,
-            mist: false
+            mist: false,
         },
         visualizer: {
             minimized: false,

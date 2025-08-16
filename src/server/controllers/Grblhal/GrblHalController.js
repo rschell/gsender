@@ -933,7 +933,7 @@ class GrblHalController {
             this.emit('grblHal:info', res);
         });
 
-        this.runner.on('startup', async (res) => {
+        this.runner.on('startup', async (res, semver) => {
             this.emit('serialport:read', res.raw);
 
             // The startup message always prints upon startup, after a reset, or at program end.
@@ -954,7 +954,14 @@ class GrblHalController {
             }
 
             await delay(500);
-            this.connection.writeImmediate('$ES\n$ESH\n$EG\n$EA\n$spindles\n');
+            this.connection.write('$ES\n$ESH\n$EG\n$EA\n$#\n');
+            await delay(25);
+            console.log(semver);
+            if (semver >= 20231210) { // TODO: Verify that this version is valid for SLB as well
+                this.connection.writeln('$spindlesh');
+            } else {
+                this.connection.writeln('$spindles');
+            }
         });
 
         this.toolChanger = new ToolChanger({
@@ -981,6 +988,20 @@ class GrblHalController {
 
         this.runner.on('groupDetail', (payload) => {
             this.emit('settings:group', this.runner.settings.groups);
+        });
+
+        this.runner.on('sdcard', (payload) => {
+            this.emit('serialport:read', payload.raw);
+            delete payload.raw;
+            this.emit('sdcard:files', payload);
+        });
+
+        this.runner.on('atci', (payload) => {
+            this.emit('serialport:read', payload.raw);
+            delete payload.raw;
+            if (payload.subtype) {
+                this.emit('atci', payload);
+            }
         });
 
         const queryStatusReport = () => {
@@ -1015,7 +1036,16 @@ class GrblHalController {
                     this.connection.writeImmediate(GRBLHAL_REALTIME_COMMANDS.COMPLETE_REALTIME_REPORT);
                     this.actionMask.alarmCompleteReport = false;
                 } else {
-                    this.connection.writeImmediate(GRBLHAL_REALTIME_COMMANDS.STATUS_REPORT); //? or \x80
+                    // Every 20 status reports, request a full one
+                    if (this.actionMask.queryStatusCount === 20) {
+                        //this.connection.writeln(GRBLHAL_REALTIME_COMMANDS.COMPLETE_REALTIME_REPORT);
+                        this.connection.writeln('\x87');
+                        this.actionMask.queryStatusCount = 0;
+                    } else {
+                        this.connection.writeImmediate(GRBLHAL_REALTIME_COMMANDS.STATUS_REPORT); //? or \x80
+                        this.actionMask.queryStatusCount += 1;
+                    }
+
                     if (!this.actionMask.alarmCompleteReport) {
                         this.actionMask.alarmCompleteReport = true;
                     }
@@ -1151,6 +1181,8 @@ class GrblHalController {
         // $13=1 (report in inches)
         this.writeln('$$');
         await delay(50);
+        this.writeln('$I');
+        await delay(50);
         this.event.trigger(CONTROLLER_READY);
     }
 
@@ -1249,6 +1281,7 @@ class GrblHalController {
         this.actionMask.replyParserState = false;
         this.actionMask.replyStatusReport = false;
         this.actionMask.axsReportCount = 0;
+        this.actionMask.queryStatusCount = 0;
         this.actionTime.queryParserState = 0;
         this.actionTime.queryStatusReport = 0;
         this.actionTime.senderFinishTime = 0;
@@ -2169,7 +2202,33 @@ class GrblHalController {
             },
             'runner:resetSettings': () => {
                 this.runner.deleteSettings();
-            }
+            },
+            'sdcard:mount': () => {
+                this.writeln('$FM');
+            },
+            'sdcard:list': () => {
+                const [type = 'cnc'] = args;
+
+                if (type === 'cnc') {
+                    this.writeln('$F');
+                    return;
+                }
+
+                if (type === 'all') {
+                    this.writeln('$F+');
+                    return;
+                }
+            },
+            'sdcard:run': () => {
+                const [filePath] = args;
+
+                this.writeln(`$F=${filePath}`);
+            },
+            'sdcard:delete': () => {
+                const [filePath] = args;
+
+                this.writeln(`$FD=${filePath}`);
+            },
         }[cmd];
 
         if (!handler) {

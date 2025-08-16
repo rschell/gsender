@@ -79,10 +79,13 @@ import {
     updateHomingFlag,
     updateSenderStatus,
     updateControllerType,
+    addSDCardFileToList,
+    clearSDCardFiles,
 } from '../slices/controller.slice';
 import {
     FILE_TYPE_T,
     PortInfo,
+    SDCardFile,
     SerialPortOptions,
     WORKFLOW_STATES_T,
 } from '../../definitions';
@@ -923,6 +926,56 @@ export function* initialize(): Generator<any, void, any> {
 
     controller.addListener('job:start', () => {
         errors = [];
+    });
+
+    controller.addListener('sdcard:files', (file: SDCardFile) => {
+        if (!file) return;
+        reduxStore.dispatch(addSDCardFileToList({ file }));
+    });
+
+    controller.addListener('atci', (payload) => {
+        if (payload.subtype === '0') {
+            Confirm({
+                title: payload.message,
+                content: payload.description,
+                confirmLabel: 'Continue',
+                cancelLabel: 'Reset',
+                onConfirm: () => {
+                    controller.command('cyclestart');
+                },
+                onClose: () => {
+                    controller.command('reset');
+                },
+            });
+        } else if (payload.subtype === '1') {
+            Confirm({
+                title: payload.message,
+                content: payload.description,
+                confirmLabel: 'OK',
+                cancelLabel: 'Reset',
+                onConfirm: () => {
+                    controller.command('cyclestart');
+                },
+                hideClose: true,
+            });
+        } else if (payload.subtype === '2') {
+            Confirm({
+                title: payload.message,
+                content: payload.description,
+                confirmLabel: 'Reset',
+                onConfirm: () => {
+                    controller.command('reset');
+                },
+                hideClose: true,
+            });
+        } else {
+            Confirm({
+                title: 'ATCi requested a dialog.',
+                content: 'Continue to unhold, Reset to stop action.',
+                confirmLabel: 'Continue',
+                cancelLabel: 'Reset',
+            });
+        }
     });
 
     yield null;
